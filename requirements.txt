@@ -1,0 +1,7 @@
+Django>=5.0,<6
+# python-decouple: config from .env; import as "from decouple import config".
+# Do NOT install "decouple" — it is a different package.
+python-decouple>=3.8
+openai>=1.66.0
+pytest>=8.0
+pytest-django>=4.8

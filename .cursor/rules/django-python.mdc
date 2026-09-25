@@ -1,0 +1,38 @@
+---
+description: Django and Python conventions
+globs: **/*.py
+alwaysApply: false
+---
+
+# Django / Python
+
+## Layering
+
+```text
+views / API / management commands  →  request/services.py  →  models.py
+```
+
+- Put reusable business logic in `services.py`, not duplicated in views, API handlers, or CLI
+- Project package: `conf/` with split settings under `conf/settings/`
+
+## Management commands (CLI)
+
+Human and agent use the same doors: `python manage.py <command>`.
+
+- Naming: `<entity>_<action>` (e.g. `thing_list`, `thing_show`)
+- List/show commands: support `--json` for stable stdout (agents parse JSON; humans can omit it for tables)
+- Example: `.venv/bin/python manage.py thing_list --json`
+- Commands call `request/services.py` only — no raw ORM in command classes
+- Register each agent-facing command in `AGENTS.md` (one line: purpose + flags)
+
+## Habits
+
+- Migrations: one logical change per migration
+- Use `.venv/bin/python` for `manage.py` and tests (or activate the venv first)
+- Tests only when requested or they cover meaningful behaviour
+
+## Imports
+
+- Cross-app: absolute from app package (`from request.models import Thing`)
+- Same app: absolute or single-dot relative (`from .models import Thing`)
+- Never use multi-level relative imports across apps (`from ..otherapp import ...`)

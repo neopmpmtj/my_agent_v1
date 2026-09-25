@@ -1,0 +1,17 @@
+---
+description: Core working agreements for all work in this project
+alwaysApply: true
+---
+
+# Core conventions
+
+- **Minimize scope** — smallest correct change; avoid unrelated edits.
+- **Match the codebase** — follow existing naming, structure, and patterns.
+- **No secrets in repo** — never commit credentials, `.env`, or API keys.
+- **Plain frontend** — Django templates + plain JavaScript; no React or Vue unless explicitly requested.
+- **Read first** — check [`docs/handoff.md`](docs/handoff.md) and [`docs/project-plan.md`](docs/project-plan.md) before large changes.
+- **Project plan** — when you spot new plans or follow-ups not yet captured, ask: "Should I add this to `docs/project-plan.md`?"
+- **Incremental work** — one concept at a time; phase 2 adds DRF and OpenAI on `request`.
+- **No emoji in logs** — keep terminal output plain.
+- **Plans** — do not edit `.cursor/plans/` unless the user asks.
+- **End of session** — after substantive work, run `/session-handoff` or skill `session-handoff`.

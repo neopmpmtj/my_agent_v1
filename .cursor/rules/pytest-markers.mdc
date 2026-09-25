@@ -1,0 +1,52 @@
+---
+description: Require unit/integration pytest markers on every test
+alwaysApply: true
+---
+
+# Pytest markers (required)
+
+Every test function **must** be tagged `@pytest.mark.unit` or `@pytest.mark.integration`. Root [`conftest.py`](conftest.py) fails collection if either is missing. Markers are registered in [`pytest.ini`](pytest.ini).
+
+## Definitions
+
+| Marker | Use when |
+|--------|----------|
+| `unit` | In-process only: `services.py`, models, form `clean_*`, helpers. No Django test client, no `call_command`, no HTTP. |
+| `integration` | Django test client (`client.get` / `client.post`), management commands (`call_command`), WeasyPrint/PDF or quote HTTP. |
+
+`@pytest.mark.django_db` is separate — add it when the test touches the database (most tests here). A test can be `unit` + `django_db`, or `integration` + `django_db`.
+
+Pure helpers with no DB (e.g. `normalize_lang`) get `unit` only.
+
+## How to tag
+
+**Uniform file** — module-level:
+
+```python
+pytestmark = [pytest.mark.unit, pytest.mark.django_db]
+```
+
+**Mixed file** — per test:
+
+```python
+@pytest.mark.integration
+@pytest.mark.django_db
+def test_staff_can_create_client(client, staff_user):
+    ...
+```
+
+When adding tests, tag them in the same PR — do not leave unmarked tests for a later pass.
+
+## Commands
+
+```bash
+pytest -m unit
+pytest -m integration
+pytest
+```
+
+## Checklist for new/changed tests
+
+- [ ] Exactly one of `unit` or `integration` on every `test_*`
+- [ ] `django_db` present when the test needs the DB (or uses `db` / ORM fixtures)
+- [ ] `pytest -q` green after changes
