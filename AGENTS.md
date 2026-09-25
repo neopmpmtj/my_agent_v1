@@ -27,7 +27,9 @@ Run from repo root with `.venv/bin/python manage.py …`.
 | `model_list` | List catalogued models. `--json` includes `endpoint_kinds_in_catalog`. Use `--all` to see inactive API ids. |
 | `model_show --model <id>` | One model row plus CLI defaults. |
 | `model_add --model <id>` | Look up prices (LiteLLM JSON), write the curated file, then `model_sync` so the model is active for `llm_ask`. Optional `--input-cost-per-1m` / `--output-cost-per-1m` / `--endpoint-kind` / `--default`. |
-| `llm_ask --prompt "..."` | Stateless single turn: one prompt in, one reply out. `--model`, `--max-output-tokens`, `--temperature`, `--system`. |
+| `auth_login --provider openai` | Browser PKCE ChatGPT/Codex OAuth. Tokens in gitignored `.auth/openai.json`. Other providers fail until implemented. |
+| `auth_status --provider openai` | Logged in / expired / plan. Never prints tokens. |
+| `llm_ask --prompt "..."` | Stateless single turn: one prompt in, one reply out. `--model`, `--max-output-tokens`, `--temperature`, `--system`, `--auth auto\|oauth\|api_key`. |
 
 Conventions: list/show support `--json`; writes use explicit flags; errors on stderr (or `{ok: false, error}` with `--json`); non-zero exit on failure.
 
@@ -39,7 +41,8 @@ Examples:
 .venv/bin/python manage.py model_sync --json
 .venv/bin/python manage.py model_list --all --json
 .venv/bin/python manage.py model_add --model gpt-5-mini --json
-.venv/bin/python manage.py llm_ask --prompt "why is the sky blue?" --model gpt-5-mini --json
+.venv/bin/python manage.py auth_login --provider openai --json
+.venv/bin/python manage.py llm_ask --prompt "why is the sky blue?" --model gpt-5.6-terra --json
 ```
 
 ## Do
@@ -47,12 +50,12 @@ Examples:
 - Read `docs/handoff.md` and `docs/project-plan.md` before large changes
 - When you notice new plans not in the backlog, ask: "Should I add this to `docs/project-plan.md`?"
 - Use `.venv/bin/python` for `manage.py` and tests (or activate the venv first)
-- Put secrets in root `.env` only; use `.env.example` as the committed template
+- Put secrets in root `.env` only; OAuth tokens in gitignored `.auth/`; use `.env.example` as the committed template
 - End substantive sessions with `/session-handoff` or skill `session-handoff`
 
 ## Do not
 
-- Commit `.env`, API keys, or `db.sqlite3`
+- Commit `.env`, `.auth/`, API keys, or `db.sqlite3`
 - Store conversation history in v1 (`llm_ask` is stateless)
 - Edit `.cursor/plans/` unless the user asks
 - Use emoji in logs or prints
@@ -64,6 +67,7 @@ source .venv/bin/activate
 cp .env.example .env   # if .env missing
 .venv/bin/python manage.py migrate
 .venv/bin/python manage.py model_sync --json
+.venv/bin/python manage.py auth_login --provider openai --json
 .venv/bin/python manage.py llm_ask --prompt "why is the sky blue?" --json
 pytest
 ```
@@ -80,8 +84,8 @@ pytest
 
 ## Session
 
-**Done:** Django scaffold; LLM catalog; `model_add` (LiteLLM prices → JSON → sync); stateless `llm_ask`.
+**Done:** Django scaffold; LLM catalog; `model_add`; stateless `llm_ask`; ChatGPT/Codex OAuth (`auth_login` / `auth_status`, `llm_ask --auth`).
 
-**Not done:** Multi-turn / tool loops; DRF; persisting Q&A.
+**Not done:** Anthropic; multi-turn / tool loops; DRF; persisting Q&A.
 
-**Next:** `model_list --all`, `model_add --model <id>`, then `llm_ask --model <id>`.
+**Next:** `auth_login --provider openai`, then `llm_ask --model gpt-5.6-terra`.

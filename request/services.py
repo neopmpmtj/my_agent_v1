@@ -12,6 +12,17 @@ from django.conf import settings
 from django.utils import timezone
 
 from request.models import LLMModel
+from request.oauth import (
+    AUTH_API_KEY,
+    AUTH_AUTO,
+    AUTH_MODES,
+    AUTH_OAUTH,
+    CODEX_BASE_URL,
+    ORIGINATOR,
+    load_fresh_openai_tokens,
+    login_openai as _login_openai,
+    provider_auth_status,
+)
 
 PROVIDER_OPENAI = "openai"
 DEFAULT_MAX_OUTPUT_TOKENS = 1024
@@ -237,6 +248,20 @@ def _openai_client(client=None):
     return OpenAI(api_key=settings.OPENAI_API_KEY)
 
 
+def _codex_client(access_token: str, account_id: str):
+    from openai import OpenAI
+
+    return OpenAI(
+        api_key=access_token,
+        base_url=CODEX_BASE_URL,
+        default_headers={
+            "ChatGPT-Account-ID": account_id,
+            "OpenAI-Beta": "responses=experimental",
+            "originator": ORIGINATOR,
+        },
+    )
+
+
 def _list_api_model_ids(client) -> set[str]:
     ids = set()
     for item in client.models.list():
@@ -308,6 +333,8 @@ def sync_model_catalog(catalog_file: Path | None = None, openai_client=None) -> 
             notes.append(note)
             warnings.append(note)
         extra = dict(entry.get("extra_params") or {})
+        if "supports_codex_oauth" in entry:
+            extra["supports_codex_oauth"] = bool(entry["supports_codex_oauth"])
         defaults = {
             "display_name": entry.get("display_name") or model_id,
             "endpoint_kind": endpoint_kind,
@@ -435,6 +462,53 @@ def resolve_model(model_id: str | None = None) -> tuple[LLMModel, list[str]]:
     return obj, warnings
 
 
+def model_supports_codex_oauth(model: LLMModel) -> bool:
+    if model.endpoint_kind != LLMModel.EndpointKind.RESPONSES:
+        return False
+    extra = model.extra_params or {}
+    return bool(extra.get("supports_codex_oauth"))
+
+
+def auth_login(provider: str | None = None, **kwargs) -> dict:
+    return _login_openai(provider, **kwargs)
+
+
+def auth_status(provider: str | None = None, auth_dir=None) -> dict:
+    return provider_auth_status(provider, auth_dir=auth_dir)
+
+
+def resolve_auth_mode(
+    model: LLMModel,
+    auth_mode: str | None = None,
+    *,
+    auth_dir=None,
+    post_token=None,
+) -> tuple[str, dict | None]:
+    mode = (auth_mode or AUTH_AUTO).strip().lower() or AUTH_AUTO
+    if mode not in AUTH_MODES:
+        raise RequestError(f"Unknown auth mode: {auth_mode}")
+    supports = model_supports_codex_oauth(model)
+    if mode == AUTH_API_KEY:
+        return AUTH_API_KEY, None
+    if mode == AUTH_OAUTH:
+        if not supports:
+            raise RequestError(
+                f"{model.model_id} does not support ChatGPT OAuth. "
+                "Use --model gpt-5.6-terra or --auth api_key."
+            )
+        tokens = load_fresh_openai_tokens(auth_dir, post_token=post_token)
+        if not tokens:
+            raise RequestError(
+                "Not logged in. Run: python manage.py auth_login --provider openai"
+            )
+        return AUTH_OAUTH, tokens
+    if supports:
+        tokens = load_fresh_openai_tokens(auth_dir, post_token=post_token)
+        if tokens:
+            return AUTH_OAUTH, tokens
+    return AUTH_API_KEY, None
+
+
 def estimate_cost(model: LLMModel, input_tokens: int, output_tokens: int) -> str | None:
     if model.input_cost_per_1m is None or model.output_cost_per_1m is None:
         return None
@@ -453,6 +527,9 @@ def complete_single_turn(
     temperature: float | None = None,
     system: str | None = None,
     openai_client=None,
+    auth_mode: str | None = None,
+    auth_dir=None,
+    post_token=None,
 ) -> dict:
     if not (prompt or "").strip():
         raise RequestError("prompt is required.")
@@ -473,27 +550,112 @@ def complete_single_turn(
     if temp is None:
         temp = model.default_temperature if model.default_temperature is not None else 1.0
 
-    client = _openai_client(openai_client)
-    if model.endpoint_kind == LLMModel.EndpointKind.RESPONSES:
-        text, input_tokens, output_tokens = _complete_via_responses(
-            client, model.model_id, prompt, tokens, temp, system
+    resolved_auth, oauth_tokens = resolve_auth_mode(
+        model, auth_mode, auth_dir=auth_dir, post_token=post_token
+    )
+
+    if openai_client is not None:
+        client = openai_client
+    elif resolved_auth == AUTH_OAUTH:
+        client = _codex_client(
+            oauth_tokens["access_token"], oauth_tokens["account_id"]
         )
     else:
-        text, input_tokens, output_tokens = _complete_via_chat(
-            client, model.model_id, prompt, tokens, temp, system
+        client = _openai_client()
+
+    use_oauth_kwargs = resolved_auth == AUTH_OAUTH
+    try:
+        if model.endpoint_kind == LLMModel.EndpointKind.RESPONSES:
+            text, input_tokens, output_tokens = _complete_via_responses(
+                client,
+                model.model_id,
+                prompt,
+                tokens,
+                temp,
+                system,
+                oauth=use_oauth_kwargs,
+            )
+        else:
+            text, input_tokens, output_tokens = _complete_via_chat(
+                client, model.model_id, prompt, tokens, temp, system
+            )
+    except Exception as exc:
+        retried = _retry_oauth_after_unauthorized(
+            exc,
+            openai_client=openai_client,
+            resolved_auth=resolved_auth,
+            auth_dir=auth_dir,
+            post_token=post_token,
         )
+        if retried is None:
+            _reraise_openai_error(exc)
+        client = retried
+        if model.endpoint_kind == LLMModel.EndpointKind.RESPONSES:
+            text, input_tokens, output_tokens = _complete_via_responses(
+                client,
+                model.model_id,
+                prompt,
+                tokens,
+                temp,
+                system,
+                oauth=use_oauth_kwargs,
+            )
+        else:
+            text, input_tokens, output_tokens = _complete_via_chat(
+                client, model.model_id, prompt, tokens, temp, system
+            )
+
+    estimated = None
+    if resolved_auth != AUTH_OAUTH:
+        estimated = estimate_cost(model, input_tokens, output_tokens)
 
     return {
         "text": text or "",
         "model_id": model.model_id,
         "endpoint_kind": model.endpoint_kind,
+        "auth_mode": resolved_auth,
         "usage": {
             "input_tokens": input_tokens,
             "output_tokens": output_tokens,
         },
-        "estimated_cost_usd": estimate_cost(model, input_tokens, output_tokens),
+        "estimated_cost_usd": estimated,
         "warnings": warnings,
     }
+
+
+def _is_unauthorized(exc) -> bool:
+    status = getattr(exc, "status_code", None)
+    return status == 401
+
+
+def _retry_oauth_after_unauthorized(
+    exc,
+    *,
+    openai_client,
+    resolved_auth,
+    auth_dir,
+    post_token,
+):
+    if openai_client is not None or resolved_auth != AUTH_OAUTH:
+        return None
+    if not _is_unauthorized(exc):
+        return None
+    tokens = load_fresh_openai_tokens(
+        auth_dir, post_token=post_token, force_refresh=True
+    )
+    if not tokens:
+        raise RequestError(
+            "Not logged in. Run: python manage.py auth_login --provider openai"
+        )
+    return _codex_client(tokens["access_token"], tokens["account_id"])
+
+
+def _reraise_openai_error(exc):
+    status = getattr(exc, "status_code", None)
+    message = str(exc)
+    if status:
+        raise RequestError(f"OpenAI request failed ({status}): {message}") from exc
+    raise exc
 
 
 def _complete_via_chat(client, model_id, prompt, max_output_tokens, temperature, system):
@@ -515,7 +677,9 @@ def _complete_via_chat(client, model_id, prompt, max_output_tokens, temperature,
     return text, input_tokens, output_tokens
 
 
-def _complete_via_responses(client, model_id, prompt, max_output_tokens, temperature, system):
+def _complete_via_responses(
+    client, model_id, prompt, max_output_tokens, temperature, system, oauth=False
+):
     kwargs = {
         "model": model_id,
         "input": prompt,
@@ -524,6 +688,8 @@ def _complete_via_responses(client, model_id, prompt, max_output_tokens, tempera
     }
     if system:
         kwargs["instructions"] = system
+    if oauth:
+        kwargs["store"] = False
     response = client.responses.create(**kwargs)
     text = getattr(response, "output_text", None) or ""
     usage = getattr(response, "usage", None)

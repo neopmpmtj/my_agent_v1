@@ -21,6 +21,12 @@ If LiteLLM has no row, pass `--input-cost-per-1m` and `--output-cost-per-1m`. Op
 
 `llm_ask` is stateless: one prompt in, one reply out.
 
+## ChatGPT subscription (OAuth)
+
+Plus/Go is not Platform API credit. `auth_login --provider openai` runs the Codex PKCE flow (same public client id as Codex CLI: `app_EMoamEEZ73f0CkXaXp7hrann`) and stores tokens in gitignored `.auth/openai.json`. `llm_ask --auth auto` uses that session for models marked `supports_codex_oauth` (currently `gpt-5.6-terra`) against `https://chatgpt.com/backend-api/codex/responses`. Other models keep using `OPENAI_API_KEY`. `--provider` is required later for Anthropic; v1 implements openai only.
+
+This Codex backend is unofficial for third-party clients and can change. Do not scrape chatgpt.com as a website API. No `auth_logout` in v1 (delete `.auth/openai.json` to drop the session).
+
 ## Commands
 
 ```bash
@@ -29,5 +35,8 @@ python manage.py model_list --json
 python manage.py model_list --all --json
 python manage.py model_show --model gpt-4o-mini --json
 python manage.py model_add --model gpt-5-mini --json
-python manage.py llm_ask --prompt "why is the sky blue?" --model gpt-4o-mini --json
+python manage.py auth_login --provider openai --json
+python manage.py auth_status --provider openai --json
+python manage.py llm_ask --prompt "why is the sky blue?" --model gpt-5.6-terra --json
+python manage.py llm_ask --prompt "why is the sky blue?" --model gpt-4o-mini --auth api_key --json
 ```

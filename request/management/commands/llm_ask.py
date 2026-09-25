@@ -18,6 +18,11 @@ class Command(JsonCommand):
         )
         parser.add_argument("--temperature", type=float, default=None)
         parser.add_argument("--system", default="", help="Optional system message.")
+        parser.add_argument(
+            "--auth",
+            default="auto",
+            help="auto (default), oauth, or api_key.",
+        )
 
     def handle(self, *args, **options):
         as_json = options["json"]
@@ -28,6 +33,7 @@ class Command(JsonCommand):
                 max_output_tokens=options["max_output_tokens"],
                 temperature=options["temperature"],
                 system=options["system"] or None,
+                auth_mode=options["auth"],
             )
         except RequestError as exc:
             self.fail(str(exc), as_json)
@@ -36,6 +42,7 @@ class Command(JsonCommand):
                 text=result["text"],
                 model_id=result["model_id"],
                 endpoint_kind=result["endpoint_kind"],
+                auth_mode=result["auth_mode"],
                 usage=result["usage"],
                 estimated_cost_usd=result["estimated_cost_usd"],
             )

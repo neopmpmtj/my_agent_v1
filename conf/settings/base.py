@@ -84,3 +84,4 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 OPENAI_API_KEY = config("OPENAI_API_KEY", default="")
 OPENAI_MODEL = config("OPENAI_MODEL", default="gpt-4o-mini")
+AUTH_DIR = Path(config("AUTH_DIR", default=str(BASE_DIR / ".auth")))

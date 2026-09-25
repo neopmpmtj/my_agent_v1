@@ -9,3 +9,10 @@ def pytest_collection_modifyitems(config, items):
                 f"{item.nodeid} must be marked @pytest.mark.unit or "
                 "@pytest.mark.integration"
             )
+
+
+@pytest.fixture(autouse=True)
+def isolate_auth_dir(tmp_path, settings):
+    settings.AUTH_DIR = tmp_path / "auth"
+    settings.AUTH_DIR.mkdir()
+
