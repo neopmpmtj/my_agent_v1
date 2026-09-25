@@ -3,6 +3,9 @@
 Durable backlog. Append items when the user confirms; tick on session-handoff.
 
 - [x] Django bootstrap with `conf/`, `request`, `.env`, pytest (completed 2026-09-25)
-- [ ] Agent CLI: management commands on `request` (`<entity>_<action>`, `--json` on list/show)
-- [ ] OpenAI integration via `request/services.py`
+- [x] Agent CLI: `model_sync`, `model_list`, `model_show`, `llm_ask` (`--json` on list/show) (completed 2026-09-25)
+- [x] Hybrid OpenAI catalog: `request/catalog/openai_models.json` + `models.list` (completed 2026-09-25)
+- [x] Single-turn OpenAI completion via `request/services.py` (`complete_single_turn`) (completed 2026-09-25)
+- [x] `model_add`: LiteLLM price lookup → `openai_models.json` → sync (completed 2026-09-25)
 - [ ] Optional: Django REST framework on `request` (only if HTTP clients need it)
+- [ ] v2: agent tool loops (`agent_run`), multi-turn storage

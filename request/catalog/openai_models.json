@@ -1,0 +1,46 @@
+{
+  "_comment": "Pricing is manual from OpenAI docs. After edits, run: python manage.py model_sync",
+  "models": [
+    {
+      "model_id": "gpt-4o-mini",
+      "display_name": "GPT-4o mini",
+      "endpoint_kind": "chat_completions",
+      "input_cost_per_1m": "0.15",
+      "output_cost_per_1m": "0.60",
+      "max_input_tokens": 128000,
+      "max_output_tokens": 16384,
+      "default_temperature": 1.0,
+      "supports_json_mode": true,
+      "is_agent_capable": true,
+      "is_default": true,
+      "modalities": ["text"]
+    },
+    {
+      "model_id": "gpt-4o",
+      "display_name": "GPT-4o",
+      "endpoint_kind": "chat_completions",
+      "input_cost_per_1m": "2.50",
+      "output_cost_per_1m": "10.00",
+      "max_input_tokens": 128000,
+      "max_output_tokens": 16384,
+      "default_temperature": 1.0,
+      "supports_json_mode": true,
+      "is_agent_capable": true,
+      "is_default": false,
+      "modalities": ["text"]
+    },
+    {
+      "model_id": "o3-mini",
+      "display_name": "o3-mini",
+      "endpoint_kind": "responses",
+      "input_cost_per_1m": "1.10",
+      "output_cost_per_1m": "4.40",
+      "max_input_tokens": 200000,
+      "max_output_tokens": 100000,
+      "supports_json_mode": false,
+      "is_agent_capable": true,
+      "is_default": false,
+      "modalities": ["text"]
+    }
+  ]
+}

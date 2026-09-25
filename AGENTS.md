@@ -1,9 +1,10 @@
 # my_agent_v1 — Agent instructions
 
-Django 5 chatbot scaffold. Settings in `conf/`. Domain logic lives in **`request/services.py`**. Agents and humans run the same **management commands**; add HTTP (DRF) only when something needs a network API.
+Django 5. Settings in `conf/`. Domain logic lives in **`request/services.py`**. Agents and humans run the same **management commands**.
 
 **Read [`docs/handoff.md`](docs/handoff.md) first** — session snapshot (done / not done / next).  
-**Read [`docs/project-plan.md`](docs/project-plan.md)** — durable backlog.
+**Read [`docs/project-plan.md`](docs/project-plan.md)** — durable backlog.  
+**Read [`request/README.md`](request/README.md)** — catalog + CLI for the standalone `request` app.
 
 ## Architecture
 
@@ -18,13 +19,28 @@ views / API (optional)  ──────────────────�
 
 ## Agent CLI
 
-Run from repo root with `.venv/bin/python manage.py …`. Document new commands below.
+Run from repo root with `.venv/bin/python manage.py …`.
 
 | Command | Purpose |
 |---------|---------|
-| `thing_list` | List things (stub). `--json` for machine-readable output. |
+| `model_sync` | Merge [`request/catalog/openai_models.json`](request/catalog/openai_models.json) with OpenAI `models.list` into the DB. Manual only (not on every ask). |
+| `model_list` | List catalogued models. `--json` includes `endpoint_kinds_in_catalog`. Use `--all` to see inactive API ids. |
+| `model_show --model <id>` | One model row plus CLI defaults. |
+| `model_add --model <id>` | Look up prices (LiteLLM JSON), write the curated file, then `model_sync` so the model is active for `llm_ask`. Optional `--input-cost-per-1m` / `--output-cost-per-1m` / `--endpoint-kind` / `--default`. |
+| `llm_ask --prompt "..."` | Stateless single turn: one prompt in, one reply out. `--model`, `--max-output-tokens`, `--temperature`, `--system`. |
 
-Conventions: `thing_list --json`, `thing_show <id> --json`; writes use explicit flags; errors on stderr, exit code non-zero on failure.
+Conventions: list/show support `--json`; writes use explicit flags; errors on stderr (or `{ok: false, error}` with `--json`); non-zero exit on failure.
+
+Pricing comes from LiteLLM’s public table (not an official OpenAI prices API). `model_add` writes JSON then syncs. Override with `--input-cost-per-1m` / `--output-cost-per-1m` if lookup misses.
+
+Examples:
+
+```bash
+.venv/bin/python manage.py model_sync --json
+.venv/bin/python manage.py model_list --all --json
+.venv/bin/python manage.py model_add --model gpt-5-mini --json
+.venv/bin/python manage.py llm_ask --prompt "why is the sky blue?" --model gpt-5-mini --json
+```
 
 ## Do
 
@@ -37,7 +53,7 @@ Conventions: `thing_list --json`, `thing_show <id> --json`; writes use explicit 
 ## Do not
 
 - Commit `.env`, API keys, or `db.sqlite3`
-- Over-engineer before phase 2
+- Store conversation history in v1 (`llm_ask` is stateless)
 - Edit `.cursor/plans/` unless the user asks
 - Use emoji in logs or prints
 
@@ -47,8 +63,8 @@ Conventions: `thing_list --json`, `thing_show <id> --json`; writes use explicit 
 source .venv/bin/activate
 cp .env.example .env   # if .env missing
 .venv/bin/python manage.py migrate
-.venv/bin/python manage.py runserver
-.venv/bin/python manage.py thing_list --json
+.venv/bin/python manage.py model_sync --json
+.venv/bin/python manage.py llm_ask --prompt "why is the sky blue?" --json
 pytest
 ```
 
@@ -64,8 +80,8 @@ pytest
 
 ## Session
 
-**Done:** (initial bootstrap — update on session-handoff)
+**Done:** Django scaffold; LLM catalog; `model_add` (LiteLLM prices → JSON → sync); stateless `llm_ask`.
 
-**Not done:** Management commands, OpenAI integration, conversation models; optional DRF later.
+**Not done:** Multi-turn / tool loops; DRF; persisting Q&A.
 
-**Next:** `request/services.py` + commands (e.g. `thing_list --json`); OpenAI when ready.
+**Next:** `model_list --all`, `model_add --model <id>`, then `llm_ask --model <id>`.
