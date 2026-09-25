@@ -22,7 +22,7 @@ Run from repo root with `.venv/bin/python manage.py …`. Document new commands 
 
 | Command | Purpose |
 |---------|---------|
-| *(none yet)* | Add rows as you implement services |
+| `thing_list` | List things (stub). `--json` for machine-readable output. |
 
 Conventions: `thing_list --json`, `thing_show <id> --json`; writes use explicit flags; errors on stderr, exit code non-zero on failure.
 
@@ -48,6 +48,7 @@ source .venv/bin/activate
 cp .env.example .env   # if .env missing
 .venv/bin/python manage.py migrate
 .venv/bin/python manage.py runserver
+.venv/bin/python manage.py thing_list --json
 pytest
 ```
 
