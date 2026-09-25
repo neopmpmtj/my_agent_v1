@@ -196,3 +196,48 @@ def test_model_add_explicit_costs(monkeypatch, tmp_path):
     assert payload["ok"] is True
     assert payload["input_cost_per_1m"] == "2.00"
     assert payload["output_cost_per_1m"] == "8.00"
+
+
+def test_model_remove_json(monkeypatch, tmp_path):
+    catalog = tmp_path / "openai_models.json"
+    catalog.write_text(
+        json.dumps(
+            {
+                "models": [
+                    {
+                        "model_id": "gpt-4o-mini",
+                        "endpoint_kind": "chat_completions",
+                        "is_default": True,
+                        "modalities": ["text"],
+                    },
+                    {
+                        "model_id": "gpt-4o",
+                        "endpoint_kind": "chat_completions",
+                        "is_default": False,
+                        "modalities": ["text"],
+                    },
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    client = FakeOpenAIClient(["gpt-4o-mini", "gpt-4o"])
+
+    def fake_remove(model_id, **kwargs):
+        from request.services import remove_model_from_stack
+
+        return remove_model_from_stack(
+            model_id, catalog_file=catalog, openai_client=client
+        )
+
+    monkeypatch.setattr(
+        "request.management.commands.model_remove.remove_model_from_stack",
+        fake_remove,
+    )
+    out = StringIO()
+    call_command("model_remove", "--model", "gpt-4o", "--json", stdout=out)
+    payload = json.loads(out.getvalue())
+    assert payload["ok"] is True
+    assert payload["model_id"] == "gpt-4o"
+    assert payload["removed"] is True
+    assert not LLMModel.objects.get(model_id="gpt-4o").is_active

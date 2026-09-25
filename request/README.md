@@ -35,6 +35,7 @@ python manage.py model_list --json
 python manage.py model_list --all --json
 python manage.py model_show --model gpt-4o-mini --json
 python manage.py model_add --model gpt-5-mini --json
+python manage.py model_remove --model gpt-5-mini --json
 python manage.py auth_login --provider openai --json
 python manage.py auth_status --provider openai --json
 python manage.py llm_ask --prompt "why is the sky blue?" --model gpt-5.6-terra --json

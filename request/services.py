@@ -238,6 +238,68 @@ def add_model_to_stack(
     }
 
 
+def remove_model_from_stack(
+    model_id: str,
+    *,
+    catalog_file: Path | None = None,
+    openai_client=None,
+) -> dict:
+    model_id = (model_id or "").strip()
+    if not model_id:
+        raise RequestError("model_id is required.")
+
+    path = catalog_file or catalog_path()
+    document = load_catalog_document(path)
+    models = document["models"]
+    removed_entry = None
+    remaining: list[dict] = []
+    for item in models:
+        if item.get("model_id") == model_id:
+            removed_entry = item
+        else:
+            remaining.append(item)
+
+    if removed_entry is None:
+        raise RequestError(f"{model_id} is not in the curated catalog.")
+
+    if not remaining:
+        raise RequestError(
+            "Cannot remove the only model from the curated catalog. "
+            "Add another model first."
+        )
+
+    warnings: list[str] = []
+    was_default = bool(removed_entry.get("is_default"))
+    new_default_id = None
+    if was_default:
+        remaining[0]["is_default"] = True
+        new_default_id = remaining[0].get("model_id")
+        warnings.append(
+            f"{model_id} was default; set {new_default_id} as is_default."
+        )
+
+    document["models"] = remaining
+    write_catalog_document(document, path)
+    sync_result = sync_model_catalog(catalog_file=path, openai_client=openai_client)
+    warnings.extend(sync_result.get("warnings") or [])
+
+    note = f"{model_id} was removed from openai_models.json."
+    LLMModel.objects.filter(provider=PROVIDER_OPENAI, model_id=model_id).update(
+        is_active=False,
+        is_default=False,
+        catalog_notes=note,
+    )
+
+    return {
+        "model_id": model_id,
+        "removed": True,
+        "was_default": was_default,
+        "new_default_id": new_default_id,
+        "warnings": warnings,
+        "sync": sync_result,
+    }
+
+
 def _openai_client(client=None):
     if client is not None:
         return client

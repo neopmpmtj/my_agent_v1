@@ -27,6 +27,7 @@ Run from repo root with `.venv/bin/python manage.py …`.
 | `model_list` | List catalogued models. `--json` includes `endpoint_kinds_in_catalog`. Use `--all` to see inactive API ids. |
 | `model_show --model <id>` | One model row plus CLI defaults. |
 | `model_add --model <id>` | Look up prices (LiteLLM JSON), write the curated file, then `model_sync` so the model is active for `llm_ask`. Optional `--input-cost-per-1m` / `--output-cost-per-1m` / `--endpoint-kind` / `--default`. |
+| `model_remove --model <id>` | Remove from `openai_models.json`, deactivate for `llm_ask`, then `model_sync`. Cannot remove the only curated model; removing default promotes the next row. |
 | `auth_login --provider openai` | Browser PKCE ChatGPT/Codex OAuth. Tokens in gitignored `.auth/openai.json`. Other providers fail until implemented. |
 | `auth_status --provider openai` | Logged in / expired / plan. Never prints tokens. |
 | `llm_ask --prompt "..."` | Stateless single turn: one prompt in, one reply out. `--model`, `--max-output-tokens`, `--temperature`, `--system`, `--auth auto\|oauth\|api_key`. |
@@ -84,8 +85,8 @@ pytest
 
 ## Session
 
-**Done:** Django scaffold; LLM catalog; `model_add`; stateless `llm_ask`; ChatGPT/Codex OAuth (`auth_login` / `auth_status`, `llm_ask --auth`).
+**Done:** Django scaffold; LLM catalog; `model_add` / `model_remove`; stateless `llm_ask`; ChatGPT/Codex OAuth.
 
 **Not done:** Anthropic; multi-turn / tool loops; DRF; persisting Q&A.
 
-**Next:** `auth_login --provider openai`, then `llm_ask --model gpt-5.6-terra`.
+**Next:** `auth_login` or API-key `llm_ask`; use `model_remove` to demote models from the stack.

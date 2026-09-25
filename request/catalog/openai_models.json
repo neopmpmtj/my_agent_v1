@@ -18,22 +18,6 @@
       ]
     },
     {
-      "model_id": "gpt-4o",
-      "display_name": "GPT-4o",
-      "endpoint_kind": "chat_completions",
-      "input_cost_per_1m": "2.50",
-      "output_cost_per_1m": "10.00",
-      "max_input_tokens": 128000,
-      "max_output_tokens": 16384,
-      "default_temperature": 1.0,
-      "supports_json_mode": true,
-      "is_agent_capable": true,
-      "is_default": false,
-      "modalities": [
-        "text"
-      ]
-    },
-    {
       "model_id": "o3-mini",
       "display_name": "o3-mini",
       "endpoint_kind": "responses",
@@ -63,6 +47,21 @@
       "max_input_tokens": 922000,
       "max_output_tokens": 128000,
       "supports_codex_oauth": true
+    },
+    {
+      "model_id": "gpt-5.6-sol",
+      "display_name": "gpt-5.6-sol",
+      "endpoint_kind": "responses",
+      "input_cost_per_1m": "4.000000",
+      "output_cost_per_1m": "20.000000",
+      "supports_json_mode": false,
+      "is_agent_capable": true,
+      "is_default": false,
+      "modalities": [
+        "text"
+      ],
+      "max_input_tokens": 922000,
+      "max_output_tokens": 128000
     }
   ]
 }

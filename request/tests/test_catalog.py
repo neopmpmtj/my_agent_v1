@@ -7,6 +7,7 @@ from request.services import (
     RequestError,
     add_model_to_stack,
     complete_single_turn,
+    remove_model_from_stack,
     guess_endpoint_kind,
     is_non_text_model_id,
     list_llm_models,
@@ -207,3 +208,112 @@ def test_add_model_to_stack_writes_json_and_activates(tmp_path):
 def test_add_model_to_stack_rejects_non_text():
     with pytest.raises(RequestError, match="non-text"):
         add_model_to_stack("dall-e-3")
+
+
+def test_remove_model_from_stack_deactivates_and_updates_json(tmp_path):
+    catalog = tmp_path / "openai_models.json"
+    catalog.write_text(
+        json.dumps(
+            {
+                "models": [
+                    {
+                        "model_id": "gpt-4o-mini",
+                        "display_name": "GPT-4o mini",
+                        "endpoint_kind": "chat_completions",
+                        "input_cost_per_1m": "0.15",
+                        "output_cost_per_1m": "0.60",
+                        "is_default": True,
+                        "modalities": ["text"],
+                    },
+                    {
+                        "model_id": "gpt-5-mini",
+                        "display_name": "gpt-5-mini",
+                        "endpoint_kind": "responses",
+                        "input_cost_per_1m": "0.25",
+                        "output_cost_per_1m": "2.00",
+                        "is_default": False,
+                        "modalities": ["text"],
+                    },
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    client = FakeOpenAIClient(["gpt-4o-mini", "gpt-5-mini"])
+    sync_model_catalog(catalog_file=catalog, openai_client=client)
+    result = remove_model_from_stack(
+        "gpt-5-mini", catalog_file=catalog, openai_client=client
+    )
+    assert result["removed"] is True
+    payload = json.loads(catalog.read_text(encoding="utf-8"))
+    ids = [row["model_id"] for row in payload["models"]]
+    assert ids == ["gpt-4o-mini"]
+    removed = LLMModel.objects.get(model_id="gpt-5-mini")
+    assert not removed.is_active
+    assert "removed from openai_models.json" in removed.catalog_notes
+
+
+def test_remove_model_from_stack_promotes_default(tmp_path):
+    catalog = tmp_path / "openai_models.json"
+    catalog.write_text(
+        json.dumps(
+            {
+                "models": [
+                    {
+                        "model_id": "gpt-4o-mini",
+                        "display_name": "GPT-4o mini",
+                        "endpoint_kind": "chat_completions",
+                        "is_default": True,
+                        "modalities": ["text"],
+                    },
+                    {
+                        "model_id": "gpt-4o",
+                        "display_name": "GPT-4o",
+                        "endpoint_kind": "chat_completions",
+                        "is_default": False,
+                        "modalities": ["text"],
+                    },
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    client = FakeOpenAIClient(["gpt-4o-mini", "gpt-4o"])
+    sync_model_catalog(catalog_file=catalog, openai_client=client)
+    result = remove_model_from_stack(
+        "gpt-4o-mini", catalog_file=catalog, openai_client=client
+    )
+    assert result["was_default"] is True
+    assert result["new_default_id"] == "gpt-4o"
+    payload = json.loads(catalog.read_text(encoding="utf-8"))
+    assert payload["models"][0]["model_id"] == "gpt-4o"
+    assert payload["models"][0]["is_default"] is True
+    new_default = LLMModel.objects.get(model_id="gpt-4o")
+    assert new_default.is_default
+
+
+def test_remove_model_from_stack_rejects_only_row(tmp_path):
+    catalog = tmp_path / "openai_models.json"
+    catalog.write_text(
+        json.dumps(
+            {
+                "models": [
+                    {
+                        "model_id": "gpt-4o-mini",
+                        "endpoint_kind": "chat_completions",
+                        "modalities": ["text"],
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    with pytest.raises(RequestError, match="only model"):
+        remove_model_from_stack("gpt-4o-mini", catalog_file=catalog)
+
+
+def test_remove_model_from_stack_missing_id(tmp_path):
+    catalog = tmp_path / "openai_models.json"
+    catalog.write_text(json.dumps({"models": []}), encoding="utf-8")
+    with pytest.raises(RequestError, match="not in the curated catalog"):
+        remove_model_from_stack("missing", catalog_file=catalog)
